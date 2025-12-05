@@ -318,14 +318,10 @@ def get_model_metadata_tool(depmap_id: str, keep_cols: Optional[list] = None) ->
 # -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # On Render, the port is provided via the PORT environment variable
-    port = int(os.environ.get("PORT", "8000"))
+    # Render sets the PORT environment variable.
+    # FastMCP automatically binds to 0.0.0.0 and uses this port.
+    os.environ.setdefault("PORT", os.environ.get("PORT", "8000"))
 
-    # Expose a Streamable HTTP MCP endpoint at /mcp
-    # This is what Claude / other MCP clients will connect to.
-    mcp.run(
-        transport="http",
-        host="0.0.0.0",
-        port=port,
-        path="/mcp",
-    )
+    # Start a Streamable HTTP MCP server.
+    # This will expose your server at:  http://<host>:<PORT>/mcp
+    mcp.run(transport="streamable-http")
