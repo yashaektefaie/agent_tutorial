@@ -22,15 +22,15 @@ mcp = FastMCP(
 )
 
 # URL to the DepMap CRISPR Gene Effect dataset (use your real URL here)
-CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/oxqalmas5igfhkcxnrrer/CRISPRGeneEffectTrunc.csv?rlkey=rt0pnygna3s11hisfwwalcd7p&st=c9tkgsj8&dl=0"  # TODO: replace
-LOCAL_PATH = "data/CRISPRGeneEffect.csv"
-
+CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/oxqalmas5igfhkcxnrrer/CRISPRGeneEffectTrunc.csv?rlkey=rt0pnygna3s11hisfwwalcd7p&st=c9tkgsj8&dl=1" 
+EXPRESSION_EFFECT_URL = "https://www.dropbox.com/scl/fi/your_expression_data.csv?rlkey=yourkey&st=timestamp&dl=1" 
+MODEL_URL = "https://www.dropbox.com/scl/fi/dcrt2dm5j7opco0sh70fg/Model.csv?rlkey=deun43n8h94l8xj7y3v7gwfy1&st=g87256rx&dl=1"
 
 # -----------------------------------------------------------------------------
 # STEP 1: Original helper functions (your "backbone")
 # -----------------------------------------------------------------------------
 
-def download_if_missing(url: str = CRISPR_GENE_EFFECT_URL, local_path: str = LOCAL_PATH) -> str:
+def download_if_missing(url: str = CRISPR_GENE_EFFECT_URL, local_path: str = "data/CRISPRGeneEffect.csv") -> str:
     """
     Download the CSV once if it doesn't exist locally.
     Returns the local path.
@@ -51,8 +51,8 @@ def download_if_missing(url: str = CRISPR_GENE_EFFECT_URL, local_path: str = LOC
 
 
 @lru_cache(maxsize=1)
-def load_crispr_gene_effect(url: str = CRISPR_GENE_EFFECT_URL,
-                            local_path: str = LOCAL_PATH) -> pd.DataFrame:
+def load_url(url: str = CRISPR_GENE_EFFECT_URL,
+                            local_path: str = "data/CRISPRGeneEffect.csv") -> pd.DataFrame:
     """
     Cached loader for the CRISPR gene effect matrix.
 
@@ -71,11 +71,11 @@ def load_crispr_gene_effect(url: str = CRISPR_GENE_EFFECT_URL,
 def lookup_crispr_gene_effect(gene: str,
                               depmap_id: str,
                               url: str = CRISPR_GENE_EFFECT_URL,
-                              local_path: str = LOCAL_PATH) -> Optional[float]:
+                              local_path: str = "data/CRISPRGeneEffect.csv") -> Optional[float]:
     """
     Pure Python helper that does the actual DepMap lookup.
     """
-    df = load_crispr_gene_effect(url, local_path)
+    df = load_url(url, local_path)
 
     gene = gene.upper()
 
@@ -97,6 +97,8 @@ def get_expression_tpm_log1p(
     gene: str,
     depmap_id: str,
     gene_col_candidates=("HugoSymbol", "gene", "GeneSymbol"),
+    url:str = EXPRESSION_EFFECT_URL,
+    local_path:str = "data/expression.csv"
 ) -> Optional[float]:
     """
     Look up log1p(TPM) expression for a gene in a cell line.
@@ -119,7 +121,7 @@ def get_expression_tpm_log1p(
     float or None
         log1p(TPM) value, or None if not found.
     """
-    df = _load_expression_csv()
+    df = load_url(url, local_path)
 
     gene_col = None
     for col in gene_col_candidates:
@@ -145,6 +147,55 @@ def get_expression_tpm_log1p(
     if pd.isna(value):
         return None
     return float(value)
+
+def get_model_metadata(
+    depmap_id: str,
+    keep_cols: Optional[list] = None,
+    url: str = MODEL_URL,
+    local_path: str = "data/Model.csv"
+) -> Optional[dict]:
+    """
+    Return metadata for a DepMap model (cell line).
+
+    Typical columns in Model.csv include:
+      - DepMap_ID
+      - cell_line_name
+      - lineage
+      - lineage_subtype
+      - primary_disease
+      - primary_site
+      - etc.
+
+    Parameters
+    ----------
+    depmap_id : str
+        DepMap cell line ID.
+    keep_cols : list or None
+        If provided, restrict output to these columns (plus DepMap_ID).
+
+    Returns
+    -------
+    dict or None
+        Metadata as a dict, or None if cell line not found.
+    """
+    df = load_url(url, local_path)
+
+    if "DepMap_ID" not in df.columns:
+        raise ValueError(
+            "Expected a 'DepMap_ID' column in Model.csv. Check schema."
+        )
+
+    row = df.loc[df["DepMap_ID"] == depmap_id]
+    if row.empty:
+        return None
+
+    series = row.iloc[0]
+    if keep_cols is not None:
+        cols = ["DepMap_ID"] + [c for c in keep_cols if c in series.index]
+        series = series[cols]
+
+    return series.to_dict()
+
 
 # -----------------------------------------------------------------------------
 # STEP 2: Expose the function as an MCP tool
@@ -188,6 +239,113 @@ def get_crispr_gene_effect(gene: str, depmap_id: str) -> dict:
         "found": True,
     }
 
+@mcp.tool()
+def get_crispr_gene_effect(gene: str, depmap_id: str) -> dict:
+    """
+    Look up the CRISPR gene effect score for a specific gene in a specific cell line.
+
+    Args:
+        gene: HGNC gene symbol (e.g., "TP53", "KRAS", "BRCA1").
+        depmap_id: DepMap cell line ID (e.g., "ACH-000001").
+
+    Returns:
+        A JSON-serializable dict with:
+            - gene
+            - depmap_id
+            - effect (float or null)
+            - found (bool)
+            - message (string, optional error message)
+    """
+    score = lookup_crispr_gene_effect(gene=gene, depmap_id=depmap_id)
+
+    if score is None:
+        return {
+            "gene": gene.upper(),
+            "depmap_id": depmap_id,
+            "effect": None,
+            "found": False,
+            "message": (
+                "Gene or cell line not found in CRISPRGeneEffect matrix, "
+                "or value could not be parsed as a float."
+            ),
+        }
+
+    return {
+        "gene": gene.upper(),
+        "depmap_id": depmap_id,
+        "effect": score,
+        "found": True,
+    }
+
+@mcp.tool()
+def get_expression_tpm_log1p_tool(gene: str, depmap_id: str) -> dict:
+    """
+    Look up the log1p(TPM) expression value for a specific gene in a specific cell line.
+
+    Args:
+        gene: HGNC gene symbol (e.g., "TP53", "KRAS", "BRCA1").
+        depmap_id: DepMap cell line ID (e.g., "ACH-000001").
+
+    Returns:
+        A JSON-serializable dict with:
+            - gene
+            - depmap_id
+            - log1p_tpm (float or null)
+            - found (bool)
+            - message (string, optional error message)
+    """
+    value = get_expression_tpm_log1p(gene=gene, depmap_id=depmap_id)
+
+    if value is None:
+        return {
+            "gene": gene.upper(),
+            "depmap_id": depmap_id,
+            "log1p_tpm": None,
+            "found": False,
+            "message": (
+                "Gene or cell line not found in expression matrix, "
+                "or value could not be parsed as a float."
+            ),
+        }
+
+    return {
+        "gene": gene.upper(),
+        "depmap_id": depmap_id,
+        "log1p_tpm": value,
+        "found": True,
+    }
+
+@mcp.tool()
+def get_model_metadata_tool(depmap_id: str, keep_cols: Optional[list] = None) -> dict:
+    """
+    Retrieve metadata for a specific DepMap cell line.
+
+    Args:
+        depmap_id: DepMap cell line ID (e.g., "ACH-000001").
+        keep_cols: Optional list of column names to include in the output.
+
+    Returns:
+        A JSON-serializable dict with:
+            - depmap_id
+            - metadata (dict or null)
+            - found (bool)
+            - message (string, optional error message)
+    """
+    metadata = get_model_metadata(depmap_id=depmap_id, keep_cols=keep_cols)
+
+    if metadata is None:
+        return {
+            "depmap_id": depmap_id,
+            "metadata": None,
+            "found": False,
+            "message": "Cell line not found in Model.csv.",
+        }
+
+    return {
+        "depmap_id": depmap_id,
+        "metadata": metadata,
+        "found": True,
+    }
 
 # -----------------------------------------------------------------------------
 # STEP 3: Run the MCP server
