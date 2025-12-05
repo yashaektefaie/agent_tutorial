@@ -14,11 +14,15 @@ from mcp.server.fastmcp import FastMCP
 # STEP 0: Configure MCP server
 # -----------------------------------------------------------------------------
 
+PORT = int(os.environ.get("PORT", "8000"))
+
 # Name shown to the MCP client (e.g., in tool list)
 mcp = FastMCP(
     name="depmap-crispr",
     json_response=True,      # return JSON-structured results
     stateless_http=True,     # good default for HTTP/remote deployment
+    host="0.0.0.0",   
+    port=PORT,       
 )
 
 # URL to the DepMap CRISPR Gene Effect dataset (use your real URL here)
