@@ -298,16 +298,34 @@ def get_model_metadata_tool(depmap_id: str, keep_cols: Optional[list] = None) ->
 # STEP 3: Run the MCP server
 # -----------------------------------------------------------------------------
 
-def main():
-    """
-    Entry point. Starts the MCP server.
+# def main():
+#     """
+#     Entry point. Starts the MCP server.
 
-    For local dev / HTTP transport, this will listen on http://localhost:8000/mcp
-    by default when using `transport="streamable-http"`.
-    """
-    #mcp.run(transport="streamable-http")
-    mcp.run()
+#     For local dev / HTTP transport, this will listen on http://localhost:8000/mcp
+#     by default when using `transport="streamable-http"`.
+#     """
+#     #mcp.run(transport="streamable-http")
+#     mcp.run()
 
+
+# if __name__ == "__main__":
+#     # main()
+#     mcp.run(transport="http", port=8000)
+
+# -----------------------------------------------------------------------------
+# STEP 3: Run the MCP server
+# -----------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    main()
+    # On Render, the port is provided via the PORT environment variable
+    port = int(os.environ.get("PORT", "8000"))
+
+    # Expose a Streamable HTTP MCP endpoint at /mcp
+    # This is what Claude / other MCP clients will connect to.
+    mcp.run(
+        transport="http",
+        host="0.0.0.0",
+        port=port,
+        path="/mcp",
+    )
