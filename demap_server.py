@@ -23,7 +23,7 @@ mcp = FastMCP(
 
 # URL to the DepMap CRISPR Gene Effect dataset (use your real URL here)
 CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/oxqalmas5igfhkcxnrrer/CRISPRGeneEffectTrunc.csv?rlkey=rt0pnygna3s11hisfwwalcd7p&st=c9tkgsj8&dl=1" 
-EXPRESSION_EFFECT_URL = "https://www.dropbox.com/scl/fi/your_expression_data.csv?rlkey=yourkey&st=timestamp&dl=1" 
+EXPRESSION_EFFECT_URL = "https://www.dropbox.com/scl/fi/eeds00us9p12ohxgdaljh/expression_first100cols.csv?rlkey=nwzvcaprbuhl6gt1kyt1220rk&st=2r2sutw2&dl=1" 
 MODEL_URL = "https://www.dropbox.com/scl/fi/dcrt2dm5j7opco0sh70fg/Model.csv?rlkey=deun43n8h94l8xj7y3v7gwfy1&st=g87256rx&dl=1"
 
 # -----------------------------------------------------------------------------
@@ -200,44 +200,6 @@ def get_model_metadata(
 # -----------------------------------------------------------------------------
 # STEP 2: Expose the function as an MCP tool
 # -----------------------------------------------------------------------------
-
-@mcp.tool()
-def get_crispr_gene_effect(gene: str, depmap_id: str) -> dict:
-    """
-    Look up the CRISPR gene effect score for a specific gene in a specific cell line.
-
-    Args:
-        gene: HGNC gene symbol (e.g., "TP53", "KRAS", "BRCA1").
-        depmap_id: DepMap cell line ID (e.g., "ACH-000001").
-
-    Returns:
-        A JSON-serializable dict with:
-            - gene
-            - depmap_id
-            - effect (float or null)
-            - found (bool)
-            - message (string, optional error message)
-    """
-    score = lookup_crispr_gene_effect(gene=gene, depmap_id=depmap_id)
-
-    if score is None:
-        return {
-            "gene": gene.upper(),
-            "depmap_id": depmap_id,
-            "effect": None,
-            "found": False,
-            "message": (
-                "Gene or cell line not found in CRISPRGeneEffect matrix, "
-                "or value could not be parsed as a float."
-            ),
-        }
-
-    return {
-        "gene": gene.upper(),
-        "depmap_id": depmap_id,
-        "effect": score,
-        "found": True,
-    }
 
 @mcp.tool()
 def get_crispr_gene_effect(gene: str, depmap_id: str) -> dict:
