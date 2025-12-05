@@ -22,7 +22,7 @@ mcp = FastMCP(
 )
 
 # URL to the DepMap CRISPR Gene Effect dataset (use your real URL here)
-CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/oxqalmas5igfhkcxnrrer/CRISPRGeneEffectTrunc.csv?rlkey=rt0pnygna3s11hisfwwalcd7p&st=c9tkgsj8&dl=1" 
+CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/oxqalmas5igfhkcxnrrer/CRISPRGeneEffectTrunc.csv?rlkey=rt0pnygna3s11hisfwwalcd7p&st=o1w30kcz&dl=1" 
 EXPRESSION_EFFECT_URL = "https://www.dropbox.com/scl/fi/eeds00us9p12ohxgdaljh/expression_first100cols.csv?rlkey=nwzvcaprbuhl6gt1kyt1220rk&st=2r2sutw2&dl=1" 
 MODEL_URL = "https://www.dropbox.com/scl/fi/dcrt2dm5j7opco0sh70fg/Model.csv?rlkey=deun43n8h94l8xj7y3v7gwfy1&st=g87256rx&dl=1"
 
@@ -52,7 +52,8 @@ def download_if_missing(url: str = CRISPR_GENE_EFFECT_URL, local_path: str = "da
 
 @lru_cache(maxsize=1)
 def load_url(url: str = CRISPR_GENE_EFFECT_URL,
-                            local_path: str = "data/CRISPRGeneEffect.csv") -> pd.DataFrame:
+            local_path: str = "data/CRISPRGeneEffect.csv",
+            first_col: bool = False               ) -> pd.DataFrame:
     """
     Cached loader for the CRISPR gene effect matrix.
 
@@ -60,11 +61,10 @@ def load_url(url: str = CRISPR_GENE_EFFECT_URL,
     Returns a DataFrame with cell lines as rows and genes as columns.
     """
     path = download_if_missing(url, local_path)
-    df = pd.read_csv(path, index_col=0)  # first column = DepMap_ID or similar
-
-    # Normalize gene column names to upper case
-    df.columns = [c.upper() for c in df.columns]
-
+    if first_col:
+        df = pd.read_csv(path, index_col=0)
+    else:
+        df = pd.read_csv(path)
     return df
 
 
@@ -75,18 +75,22 @@ def lookup_crispr_gene_effect(gene: str,
     """
     Pure Python helper that does the actual DepMap lookup.
     """
-    df = load_url(url, local_path)
-
-    gene = gene.upper()
-
-    if gene not in df.columns:
-        # Could also raise, but returning None and an error message is gentler.
-        return None
+    df = load_url(url, local_path, first_col=True)
+    #check if demap_id in idex
 
     if depmap_id not in df.index:
         return None
 
-    val = df.loc[depmap_id, gene]
+    gene_col = None
+    for col in df.columns:
+        if gene.lower() in col.lower():
+            gene_col = col
+            break
+
+    if gene_col is None:
+        return None
+
+    val = df.loc[depmap_id, gene_col]
 
     try:
         return float(val)
@@ -96,7 +100,6 @@ def lookup_crispr_gene_effect(gene: str,
 def get_expression_tpm_log1p(
     gene: str,
     depmap_id: str,
-    gene_col_candidates=("HugoSymbol", "gene", "GeneSymbol"),
     url:str = EXPRESSION_EFFECT_URL,
     local_path:str = "data/expression.csv"
 ) -> Optional[float]:
@@ -123,27 +126,14 @@ def get_expression_tpm_log1p(
     """
     df = load_url(url, local_path)
 
-    gene_col = None
-    for col in gene_col_candidates:
-        if col in df.columns:
-            gene_col = col
-            break
-
-    if gene_col is None:
-        raise ValueError(
-            f"Could not find a gene symbol column among {gene_col_candidates}. "
-            "Check your truncated expression file."
-        )
-
-    if depmap_id not in df.columns:
-        # truncated matrix may not include this cell line
+    if depmap_id not in df["ModelID"].values:
         return None
 
-    row = df.loc[df[gene_col] == gene]
+    row = df.loc[df['ModelID'] == depmap_id]
     if row.empty:
         return None
 
-    value = row.iloc[0][depmap_id]
+    value = row.iloc[0][gene]
     if pd.isna(value):
         return None
     return float(value)
@@ -180,18 +170,13 @@ def get_model_metadata(
     """
     df = load_url(url, local_path)
 
-    if "DepMap_ID" not in df.columns:
-        raise ValueError(
-            "Expected a 'DepMap_ID' column in Model.csv. Check schema."
-        )
-
-    row = df.loc[df["DepMap_ID"] == depmap_id]
+    row = df.loc[df["ModelID"] == depmap_id]
     if row.empty:
         return None
 
     series = row.iloc[0]
     if keep_cols is not None:
-        cols = ["DepMap_ID"] + [c for c in keep_cols if c in series.index]
+        cols = ["ModelID"] + [c for c in keep_cols if c in series.index]
         series = series[cols]
 
     return series.to_dict()
@@ -202,7 +187,7 @@ def get_model_metadata(
 # -----------------------------------------------------------------------------
 
 @mcp.tool()
-def get_crispr_gene_effect(gene: str, depmap_id: str) -> dict:
+def get_crispr_gene_effect_tool(gene: str, depmap_id: str) -> dict:
     """
     Look up the CRISPR gene effect score for a specific gene in a specific cell line.
 
@@ -320,7 +305,8 @@ def main():
     For local dev / HTTP transport, this will listen on http://localhost:8000/mcp
     by default when using `transport="streamable-http"`.
     """
-    mcp.run(transport="streamable-http")
+    #mcp.run(transport="streamable-http")
+    mcp.run()
 
 
 if __name__ == "__main__":
