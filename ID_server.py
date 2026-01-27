@@ -26,7 +26,8 @@ mcp = FastMCP(
 )
 
 # URL to the DepMap CRISPR Gene Effect dataset (use your real URL here)
-CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/p4h4gmdbus4nndrxk081r/CRISPRi_Pseudomonas_aeruginosa_UCBPP-PA14_guidesCRISPRi1_genes_counts.tsv?rlkey=mt9pdamr0r9zr6x760et3dtiu&st=fxc7mdse&dl=1" 
+#CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/p4h4gmdbus4nndrxk081r/CRISPRi_Pseudomonas_aeruginosa_UCBPP-PA14_guidesCRISPRi1_genes_counts.tsv?rlkey=mt9pdamr0r9zr6x760et3dtiu&st=fxc7mdse&dl=1" 
+CRISPR_GENE_EFFECT_URL = "https://www.dropbox.com/scl/fi/x74kpldrr3l303b9pfc2p/geneIDs.tsv?rlkey=ubrm72pcpt6c3x26s6ez9p74h&st=l6rhr69w&dl=1"
 METADATA_URL = "https://www.dropbox.com/scl/fi/plas9uwyz66driom6f7nu/MOCP-0162_key.txt?rlkey=ptwrrmd9o7xfrhrbgp981x6vx&st=jaz3fgr4&dl=1" 
 GFF_URL = "https://www.dropbox.com/scl/fi/l2cp1bw1qrtnmteveae4s/Pseudomonas_aeruginosa_UCBPP-PA14_guidesCRISPRi1_ALL.gff?rlkey=7vyn0krh9rzt37ur3gs3stkis&st=lvwmafvh&dl=1"
 
